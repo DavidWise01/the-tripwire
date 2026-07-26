@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="color-scheme" content="dark"><meta name="theme-color" content="#1a0e12">
+<meta name="author" content="David Lee Wise / ROOT0 / TriPod LLC, with AVAN">
+<title>THE TRIPWIRE · bounded halt with hysteresis · SKYNET · UD0</title>
+<meta name="description" content="A tripwire that halts when a monitored metric crosses a high bound and stays halted until it falls below a low bound — hysteresis, so it never flaps. Self-testing.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath d='M6 40 L58 40' stroke='%23e0454a' stroke-width='3'/%3E%3Cpath d='M6 40 Q20 12 32 24 T58 20' fill='none' stroke='%23ffd08a' stroke-width='2'/%3E%3C/svg%3E">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--ink:#1a0e12;--pa:#fce8ea;--pa2:#e0b0b6;--dim:#a8707a;--line:rgba(224,69,74,.24);
+  --c:#e0454a;--warm:#ffd08a;--good:#7fe6a0;--bad:#ff6a6a;
+  --disp:"Iowan Old Style",Palatino,Georgia,serif;--mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+body{background:radial-gradient(1000px 600px at 20% -8%,rgba(224,69,74,.16),transparent 56%),var(--ink);color:var(--pa);font-family:var(--disp);line-height:1.6;min-height:100vh}
+*{box-sizing:border-box}
+.wrap{max-width:940px;margin:0 auto;padding:52px 22px 90px}
+.eye{font-family:var(--mono);font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--c)}
+h1{font-weight:800;font-size:clamp(2rem,6vw,3.3rem);line-height:1;margin:10px 0 6px;color:#fff;text-shadow:0 0 22px rgba(224,69,74,.4)}
+.sub{font-style:italic;color:var(--pa2);max-width:70ch;margin:6px 0 2px}
+.badge{display:inline-block;font-family:var(--mono);font-size:11px;letter-spacing:.1em;border:1px solid var(--line);border-radius:20px;padding:5px 13px;margin-top:14px;color:var(--pa2)}
+.badge.ok{color:var(--good);border-color:color-mix(in srgb,var(--good) 50%,transparent)}
+.badge.no{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 50%,transparent)}
+.panel{margin-top:24px;border:1px solid var(--line);border-radius:14px;padding:18px;background:linear-gradient(165deg,rgba(40,18,22,.5),rgba(20,10,14,.4))}
+canvas{width:100%;height:240px;display:block;border-radius:8px}
+.state{font-family:var(--mono);font-size:14px;letter-spacing:.1em;margin-top:14px;padding:10px 14px;border-radius:10px;text-align:center}
+.state.armed{background:rgba(127,230,160,.12);color:var(--good);border:1px solid color-mix(in srgb,var(--good) 40%,transparent)}
+.state.tripped{background:rgba(255,106,106,.14);color:var(--bad);border:1px solid color-mix(in srgb,var(--bad) 45%,transparent)}
+.ctl{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+button{font-family:var(--mono);font-size:11px;color:var(--pa);background:rgba(224,69,74,.1);border:1px solid var(--line);border-radius:8px;padding:8px 14px;cursor:pointer}
+button:hover{border-color:var(--c);color:#fff}
+.note{font-size:.92rem;color:var(--pa2);max-width:74ch;margin:24px 0 0;border-left:2px solid rgba(224,69,74,.5);padding-left:14px}
+footer{margin-top:38px;padding-top:20px;border-top:1px solid var(--line);font-family:var(--mono);font-size:11px;color:var(--dim);line-height:1.9}
+footer a{color:var(--pa2);text-decoration:none;border-bottom:1px dotted var(--line)}footer a:hover{color:var(--c)}
+</style></head>
+<body>
+<main class="wrap">
+  <div class="eye">SKYNET · the self-directing machine · the stopping rule</div>
+  <h1>THE TRIPWIRE</h1>
+  <p class="sub">A monitor that <em>halts</em> when a metric crosses the high bound &mdash; and, crucially, stays halted until it falls back below a <em>lower</em> bound. The gap between them is <b>hysteresis</b>: it means a signal hovering at the edge can never flap the halt on and off. A stopping rule you can trust precisely because it is reluctant to un&#8209;stop.</p>
+  <div id="selftest" class="badge">self-test: running&hellip;</div>
+
+  <div class="panel">
+    <canvas id="cv"></canvas>
+    <div class="state armed" id="state">● ARMED — monitoring</div>
+    <div class="ctl"><button onclick="feed('spike')">inject spike</button><button onclick="feed('edge')">hover at the edge</button><button onclick="feed('calm')">let it settle</button><button onclick="reset()">reset</button></div>
+  </div>
+
+  <p class="note">Two thresholds: HIGH (trip) at 0.80 and LOW (rearm) at 0.55. The state is a tiny machine &mdash; <b>ARMED</b> until the metric exceeds HIGH, then <b>TRIPPED</b> until it drops below LOW, and only then ARMED again. Because the rearm bound sits below the trip bound, a value oscillating around 0.80 stays TRIPPED (safe) instead of chattering. &#9670; HONEST: a faithful hysteresis / Schmitt&#8209;trigger stopping rule on a synthetic metric stream; a demonstration of the mechanism, not a monitor wired to a real system. A self&#8209;test verifies it trips above HIGH, holds through edge&#8209;hover without flapping, and rearms only below LOW.</p>
+
+  <footer>THE TRIPWIRE · a member of <a href="https://davidwise01.github.io/ud0/d/skynet.html">SKYNET</a> · hysteresis halt · <a href="https://0root.ai">0root.ai</a><br>trip high, rearm low · reluctant to un-stop · CC-BY-ND-4.0, David Lee Wise / ROOT0 with AVAN</footer>
+</main>
+<script>
+var HIGH=0.80, LOW=0.55;
+function step(state, x){ // pure state-transition: {tripped:bool}
+  if(!state.tripped && x>HIGH) return {tripped:true};
+  if(state.tripped && x<LOW)  return {tripped:false};
+  return {tripped:state.tripped};
+}
+var hist=[], st={tripped:false}, seed=11;
+function rnd(){ seed=(seed*1103515245+12345)&0x7fffffff; return seed/0x7fffffff; }
+function push(x){ st=step(st,x); hist.push({x:x,t:st.tripped}); if(hist.length>90)hist.shift(); render(); }
+function feed(kind){
+  if(kind==='spike'){ for(var i=0;i<8;i++) push(0.3+i*0.09); }        // rises through HIGH
+  else if(kind==='edge'){ for(var i=0;i<12;i++) push(0.78+ (rnd()-0.5)*0.08); } // hovers around HIGH
+  else if(kind==='calm'){ for(var i=0;i<10;i++) push(0.7-i*0.05); }   // falls through LOW
+}
+function reset(){ hist=[]; st={tripped:false}; render(); }
+function render(){
+  var cv=document.getElementById('cv'),g=cv.getContext('2d'),DPR=Math.min(devicePixelRatio||1,2);
+  var W=cv.clientWidth,H=cv.clientHeight;cv.width=W*DPR;cv.height=H*DPR;g.setTransform(DPR,0,0,DPR,0,0);g.clearRect(0,0,W,H);
+  function y(v){ return H-20-v*(H-40); }
+  g.strokeStyle='rgba(255,106,106,0.5)';g.setLineDash([5,4]);g.beginPath();g.moveTo(0,y(HIGH));g.lineTo(W,y(HIGH));g.stroke();
+  g.strokeStyle='rgba(127,230,160,0.4)';g.beginPath();g.moveTo(0,y(LOW));g.lineTo(W,y(LOW));g.stroke();g.setLineDash([]);
+  g.fillStyle='rgba(255,106,106,0.6)';g.font='9px ui-monospace,monospace';g.fillText('HIGH '+HIGH+' — trip',6,y(HIGH)-4);
+  g.fillStyle='rgba(127,230,160,0.6)';g.fillText('LOW '+LOW+' — rearm',6,y(LOW)+12);
+  var n=hist.length, dx=n>1?(W-20)/(n-1):0;
+  // tripped-region shading
+  for(var i=0;i<n;i++){ if(hist[i].t){ g.fillStyle='rgba(255,106,106,0.08)'; g.fillRect(10+i*dx-dx/2,10,dx+1,H-20); } }
+  g.strokeStyle='rgba(255,208,138,0.95)';g.lineWidth=1.8;g.beginPath();
+  for(var i=0;i<n;i++){ var px=10+i*dx, py=y(hist[i].x); if(i===0)g.moveTo(px,py);else g.lineTo(px,py); }
+  g.stroke();
+  for(var i=0;i<n;i++){ g.fillStyle=hist[i].t?'#ff6a6a':'#7fe6a0';g.beginPath();g.arc(10+i*dx,y(hist[i].x),2.2,0,6.283);g.fill(); }
+  var s=document.getElementById('state');
+  if(st.tripped){ s.className='state tripped'; s.textContent='■ TRIPPED — halted (rearms only below '+LOW+')'; }
+  else { s.className='state armed'; s.textContent='● ARMED — monitoring (trips above '+HIGH+')'; }
+}
+// ── self-test ──
+(function(){
+  var b=document.getElementById('selftest');
+  try{
+    var s={tripped:false};
+    s=step(s,0.6); var t1=!s.tripped;               // below HIGH: stays armed
+    s=step(s,0.85); var t2=s.tripped;               // above HIGH: trips
+    s=step(s,0.78); var t3=s.tripped;               // edge (between LOW and HIGH): STAYS tripped (no flap)
+    s=step(s,0.70); var t4=s.tripped;               // still above LOW: stays tripped
+    s=step(s,0.50); var t5=!s.tripped;              // below LOW: rearms
+    s=step(s,0.79); var t6=!s.tripped;              // below HIGH after rearm: stays armed (asymmetry)
+    if(t1&&t2&&t3&&t4&&t5&&t6){ b.className='badge ok'; b.textContent='✓ self-test: trips>HIGH ✓ · holds at edge (no flap) ✓ · rearms<LOW ✓'; }
+    else throw new Error([t1,t2,t3,t4,t5,t6].join(','));
+  }catch(e){ b.className='badge no'; b.textContent='✗ self-test FAILED: '+e.message; }
+  feed('spike');
+})();
+addEventListener('resize',render);
+</script>
+</body></html>
