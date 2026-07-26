@@ -1,0 +1,9 @@
+ROOT0-DLW-CHAIN-v1
+index : 1575
+slug  : the-tripwire
+seal  : d57e40beccf027c66988436974bf6eb5c54a29579d10fddde4578578eafb0a93
+prev  : 3c871fbc971f4c8940c9b19e93f565c317eeb35a5550279920b934cc5e8586f7
+link  : 22e85bec3ad4fba42d089da40ba21ee49bc8c519141304ea651242b189238717
+head  : 8702bbb4a24d5d501d88c05bd38d73cfb21a06519c8ce11a5656ec791ca97d32
+
+— the tether: link = sha256(index|slug|seal|prev). the chain head commits to the whole corpus.
